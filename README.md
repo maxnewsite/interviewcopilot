@@ -1,15 +1,3 @@
-<<<<<<< HEAD
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-=======
 
 # Interview Copilot 🚀
 
@@ -147,4 +135,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - React community for awesome tools
 
 
->>>>>>> origin/main
+
