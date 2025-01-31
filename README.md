@@ -1,5 +1,7 @@
 
-# Interview Copilot 🚀
+# Interview Copilot 🚀 
+## [aicopilot.chat]([https://openai.com](https://aicopilot.chat/))
+
 
 An AI-powered interview assistant that provides real-time transcription and intelligent responses during technical interviews completely build usig ***Deepseek***
 
