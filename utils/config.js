@@ -9,7 +9,6 @@ const defaultConfig = {
   5. Consider the entire conversation history when responding
   
   Current guidelines:
-  - Be concise but thorough
   - Highlight key points in responses
   - Suggest related technical concepts to explore
   - Maintain professional tone`,

@@ -84,7 +84,6 @@ export default function Home() {
         showSnackbar('Error initializing OpenAI client', 'error');
       }
     };
-    
     initializeOpenAI();
   }, []);
 
@@ -159,7 +158,7 @@ export default function Home() {
       clearTimeout(silenceTimer.current);
       silenceTimer.current = setTimeout(() => {
         askOpenAI(finalTranscript.current[source].trim(), source);
-      }, 2500); // Increased silence detection time
+      }, 1200); // Increased silence detection time
     }
   };
 
@@ -319,7 +318,6 @@ export default function Home() {
         model: config.gptModel,
         messages,
         temperature: 0.7,
-        max_tokens: 500
       });
 
       const result = response.choices[0].message.content;
