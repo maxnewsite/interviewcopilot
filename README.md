@@ -1,6 +1,6 @@
 
 # Interview Copilot 🚀 
-## [aicopilot.chat]([https://openai.com](https://aicopilot.chat/))
+## [aicopilot.chat](https://aicopilot.chat/)
 
 
 An AI-powered interview assistant that provides real-time transcription and intelligent responses during technical interviews completely build usig ***Deepseek***
@@ -33,8 +33,8 @@ An AI-powered interview assistant that provides real-time transcription and inte
 
 - Node.js (v18+)
 - npm (v9+)
-- OpenAI API key
-- Azure Speech Service subscription key
+- OpenAI API key : get your openAI key [openAI key](https://platform.openai.com/docs/overview)
+- Azure Speech Service subscription key : You can get key with free trail [Get your Azure key](https://azure.microsoft.com/en-us/pricing/purchase-options/azure-account)
 
 ### Installation
 
