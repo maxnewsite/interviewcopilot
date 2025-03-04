@@ -31,6 +31,9 @@ import { setAIResponse } from '../redux/aiResponseSlice';
 import { addToHistory } from '../redux/historySlice';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import throttle from 'lodash.throttle';
+
 
 export default function Home() {
   const dispatch = useDispatch();
@@ -53,6 +56,7 @@ export default function Home() {
   const [isManualMode, setIsManualMode] = useState(false);
   const [micTranscription, setMicTranscription] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAILoading, setIsAILoading] = useState(true);
   
   // Refs
   const systemInterimTranscription = useRef('');
@@ -64,35 +68,61 @@ export default function Home() {
   const responseEndRef = useRef(null);
 
   const [autoScroll, setAutoScroll] = useState(false); 
+  // Add config state
+  const [config, setConfig] = useState(getConfig());
+
+  const handleSettingsSaved = () => {
+    setConfig(getConfig());
+  };
 
   // Config initialization
   useEffect(() => {
-    const initializeOpenAI = () => {
-      try {
-        const config = getConfig();
-        if (!config.openaiKey) {
-          showSnackbar('OpenAI API key not configured', 'error');
-          return;
-        }
-        
-        const openaiClient = new OpenAI({
-          apiKey: config.openaiKey,
-          dangerouslyAllowBrowser: true
+    const scrollToBottom = () => {
+      if (autoScroll && responseEndRef.current) {
+        responseEndRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
         });
-        setOpenAI(openaiClient);
-      } catch (error) {
-        showSnackbar('Error initializing OpenAI client', 'error');
       }
     };
-    initializeOpenAI();
-  }, []);
-
-  // Scroll to bottom when new response arrives
-  useEffect(() => {
-    if (autoScroll && responseEndRef.current) {
-      responseEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+  
+    // Throttle scrolling to 100ms
+    const throttledScroll = throttle(scrollToBottom, 100);
+    throttledScroll();
+    
+    return () => throttledScroll.cancel();
   }, [aiResponse, autoScroll]);
+
+  useEffect(() => {
+    const initializeAI = () => {
+      try {
+        setIsAILoading(true);
+        if (config.aiModel.startsWith('gemini')) {
+          if (!config.geminiKey) {
+            showSnackbar('Gemini API key required for selected model', 'error');
+            return;
+          }
+          const genAI = new GoogleGenerativeAI(config.geminiKey);
+          setOpenAI(genAI);
+        } else {
+          if (!config.openaiKey) {
+            showSnackbar('OpenAI API key required for selected model', 'error');
+            return;
+          }
+          const openaiClient = new OpenAI({
+            apiKey: config.openaiKey,
+            dangerouslyAllowBrowser: true
+          });
+          setOpenAI(openaiClient);
+        }
+      } catch (error) {
+        showSnackbar('Error initializing AI client', 'error');
+      } finally {
+        setIsAILoading(false);
+      }
+    };
+    initializeAI();
+  }, [config.aiModel, config.geminiKey, config.openaiKey]);
 
   // Update refs when state changes
   useEffect(() => { isManualModeRef.current = isManualMode; }, [isManualMode]);
@@ -116,7 +146,7 @@ export default function Home() {
           await recognizer.stopContinuousRecognitionAsync();
           // Close the underlying media stream
           const stream = recognizer.audioConfig.stream;
-          if (stream instanceof LocalMediaStream) {
+          if (stream instanceof MediaStream) { // Changed to MediaStream
             stream.getTracks().forEach(track => track.stop());
           }
         }
@@ -144,21 +174,22 @@ export default function Home() {
   const handleTranscription = (text, source) => {
     const cleanText = text.replace(/\s+/g, ' ').trim();
     if (!cleanText) return;
-
+  
+    // Only append if in manual mode for microphone, or always for system (if auto mode enabled)
     finalTranscript.current[source] += cleanText + ' ';
-    
+  
     if (source === 'system') {
       dispatch(setTranscription(finalTranscript.current.system + systemInterimTranscription.current));
     } else {
       setMicTranscription(finalTranscript.current.microphone + micInterimTranscription.current);
     }
-
+  
     if ((source === 'system' && systemAutoModeRef.current) || 
         (source === 'microphone' && !isManualModeRef.current)) {
       clearTimeout(silenceTimer.current);
       silenceTimer.current = setTimeout(() => {
         askOpenAI(finalTranscript.current[source].trim(), source);
-      }, 1200); // Increased silence detection time
+      }, config.silenceTimerDuration * 1000); // Convert seconds to milliseconds
     }
   };
 
@@ -266,14 +297,28 @@ export default function Home() {
 
   // OpenAI integration
   const askOpenAI = async (text, source) => {
-    if (!text.trim() || !openAI) {
-      showSnackbar('OpenAI client not initialized', 'error');
+    if (!text.trim()) {
+      showSnackbar('No input text to process', 'warning');
       return;
     }
+    
+    if (!openAI) {
+      showSnackbar('AI client is initializing, please wait...', 'warning');
+      return;
+    }
+    // Add response length parameters
+  const lengthSettings = {
+    concise: { temperature: 0.5, maxTokens: 300 },
+    medium: { temperature: 0.7, maxTokens: 600 },
+    lengthy: { temperature: 0.9, maxTokens: 1200 }
+  };
 
+  const { temperature, maxTokens } = lengthSettings[config.responseLength || 'medium'];
+  
     setIsProcessing(true);
     const timestamp = new Date().toLocaleTimeString();
-    
+    let fullResponse = '';
+  
     try {
       dispatch(addToHistory({ 
         type: 'question', 
@@ -282,13 +327,13 @@ export default function Home() {
         source,
         status: 'processing'
       }));
-
-      const config = getConfig();
-      
-      // Build conversation history
+  
+      // Clear previous response immediately
+      dispatch(setAIResponse('(Generating response...)'));
+  
       const conversationHistory = history
         .filter(e => e.status !== 'processing')
-        .slice(-8) // Keep last 4 pairs of Q&A
+        .slice(-8)
         .map(event => ({
           role: event.type === 'question' ? 'user' : 'assistant',
           content: event.text,
@@ -296,52 +341,89 @@ export default function Home() {
             ? (event.source === 'system' ? 'Interviewer' : 'Candidate') 
             : 'Assistant'
         }));
-
-      const messages = [
-        { 
-          role: 'system', 
-          content: `${config.gptSystemPrompt}\nCurrent conversation context:\n${
-            history.slice(-4)
-              .map(e => `${e.type === 'question' ? 'Q' : 'A'}: ${e.text}`)
-              .join('\n')
-          }`
-        },
-        ...conversationHistory,
-        { 
-          role: 'user', 
-          content: text,
-          name: source === 'system' ? 'Interviewer' : 'Candidate'
+  
+      if (config.aiModel.startsWith('gemini')) {
+        const model = openAI.getGenerativeModel({ 
+          model: config.aiModel,
+          generationConfig: { 
+            temperature,
+            maxOutputTokens: maxTokens
+          }
+        });
+        const chat = model.startChat({
+          history: [
+            { role: 'user', parts: [{ text: config.gptSystemPrompt }] },
+            ...conversationHistory.map(msg => ({
+              role: msg.role === 'user' ? 'user' : 'model',
+              parts: [{ text: msg.content }]
+            }))
+          ],
+          generationConfig: { temperature: 0.7 }
+        });
+  
+        const result = await chat.sendMessageStream(text);
+        for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          fullResponse += chunkText;
+          dispatch(setAIResponse(fullResponse));
         }
-      ];
-
-      const response = await openAI.chat.completions.create({
-        model: config.gptModel,
-        messages,
-        temperature: 0.7,
-      });
-
-      const result = response.choices[0].message.content;
-      dispatch(setAIResponse(result));
+      } else {
+        const messages = [
+          { 
+            role: 'system', 
+            content: `${config.gptSystemPrompt}\nCurrent conversation context:\n${
+              history.slice(-4)
+                .map(e => `${e.type === 'question' ? 'Q' : 'A'}: ${e.text}`)
+                .join('\n')
+            }`
+          },
+          ...conversationHistory,
+          { 
+            role: 'user', 
+            content: text,
+            name: source === 'system' ? 'Interviewer' : 'Candidate'
+          }
+        ];
+  
+        const stream = await openAI.chat.completions.create({
+          model: config.aiModel,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+          stream: true,
+        });
+  
+        for await (const chunk of stream) {
+          const chunkText = chunk.choices[0]?.delta?.content || '';
+          fullResponse += chunkText;
+          dispatch(setAIResponse(fullResponse));
+        }
+      }
+  
       dispatch(addToHistory({ 
         type: 'response', 
-        text: result, 
+        text: fullResponse, 
         timestamp: new Date().toLocaleTimeString(),
-        context: messages
+        context: conversationHistory
       }));
-
-      // Clear appropriate transcript
-      if (source === 'system') {
-        finalTranscript.current.system = '';
-        dispatch(setTranscription('(Processing...)'));
-      } else {
-        finalTranscript.current.microphone = '';
-        setMicTranscription('(Processing...)');
-      }
-
+  
     } catch (error) {
-      console.error("OpenAI error:", error);
-      showSnackbar("OpenAI request failed: " + error.message, 'error');
+      console.error("AI error:", error);
+      showSnackbar("AI request failed: " + error.message, 'error');
+      dispatch(setAIResponse('Error generating response'));
     } finally {
+      if ((source === 'system' && systemAutoModeRef.current) ||
+          (source === 'microphone' && !isManualModeRef.current)) {
+        // Clear both the stored transcript and display state
+        finalTranscript.current[source] = '';
+        if (source === 'system') {
+          systemInterimTranscription.current = '';
+          dispatch(setTranscription(''));
+        } else {
+          micInterimTranscription.current = '';
+          setMicTranscription('');
+        }
+      }
       setIsProcessing(false);
     }
   };
@@ -521,9 +603,12 @@ export default function Home() {
             </Box>
             
             <Box sx={{ whiteSpace: 'pre-wrap', minHeight: 200 }}>
-              {formatResponse(aiResponse)}
-              <div ref={responseEndRef} />
-            </Box>
+  {formatResponse(aiResponse)}
+  {isProcessing && (
+    <CircularProgress size={20} sx={{ mt: 1 }} />
+  )}
+  <div ref={responseEndRef} />
+</Box>
             
             <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
               Previous Responses
@@ -606,7 +691,11 @@ export default function Home() {
         </Grid>
       </Grid>
 
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog 
+  open={settingsOpen} 
+  onClose={() => setSettingsOpen(false)}
+  onSave={handleSettingsSaved}
+/>
       <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
         <Alert severity={snackbarSeverity} sx={{ width: '100%' }}>
           {snackbarMessage}

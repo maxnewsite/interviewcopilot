@@ -1,12 +1,13 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-const aiResponseSlice = createSlice({
+export const aiResponseSlice = createSlice({
   name: 'aiResponse',
   initialState: '',
   reducers: {
     setAIResponse: (state, action) => action.payload,
+    appendAIResponse: (state, action) => state + action.payload,
   },
 });
 
-export const { setAIResponse } = aiResponseSlice.actions;
+export const { setAIResponse, appendAIResponse } = aiResponseSlice.actions;
 export default aiResponseSlice.reducer;
