@@ -1,29 +1,28 @@
 
-# Interview Copilot 🚀 
+# Interview Copilot 🚀
 ## [aicopilot.chat](https://aicopilot.chat/)
 
-
-An AI-powered interview assistant that provides real-time transcription and intelligent responses during technical interviews completely build usig ***Deepseek***
+An AI-powered interview assistant that provides real-time transcription and intelligent responses during technical interviews, now supporting both OpenAI and Gemini models.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![React](https://img.shields.io/badge/React-18.2.0-blue)
 ![Redux](https://img.shields.io/badge/Redux-4.2.1-purple)
 
-
-
 ## Features ✨
 
 - 🎙️ Real-time voice transcription for both interviewer and candidate
-- 🤖 AI-powered responses with conversation context awareness
+- 🤖 AI-powered responses with conversation context awareness, powered by configurable AI models (OpenAI or Gemini)
 - 💻 Code formatting and syntax highlighting
-- ⏱️ Automatic silence detection for question submission
+- ⏱️ Configurable automatic silence detection for question submission
 - 📚 Question history with combined query capability
-- ⚙️ Configurable settings for AI models and API keys
+- ⚙️ Configurable settings for AI models, API keys, response length, and system prompts
+- 🔄 Support for various Gemini models, including experimental and thinking versions
+- 📏 Configurable response length (concise, medium, lengthy)
 
 ## Technologies Used 🛠️
 
 - **Frontend**: React, Redux, Material-UI
-- **AI Services**: OpenAI GPT, Azure Cognitive Services (Speech)
+- **AI Services**: OpenAI GPT, Google Gemini, Azure Cognitive Services (Speech)
 - **Build Tools**: npm
 - **Other Libraries**: React Markdown, Highlight.js
 
@@ -33,20 +32,22 @@ An AI-powered interview assistant that provides real-time transcription and inte
 
 - Node.js (v18+)
 - npm (v9+)
-- OpenAI API key : get your openAI key [openAI key](https://platform.openai.com/docs/overview)
-- Azure Speech Service subscription key : You can get key with free trail [Get your Azure key](https://azure.microsoft.com/en-us/pricing/purchase-options/azure-account)
+- OpenAI API key: get your OpenAI key [OpenAI key](https://platform.openai.com/docs/overview)
+- Gemini API key: get your Gemini key from Google AI Studio.
+- Azure Speech Service subscription key: You can get a key with a free trial [Get your Azure key](https://azure.microsoft.com/en-us/pricing/purchase-options/azure-account)
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/hariiprasad/interviewcopilot.git
+   git clone [https://github.com/hariiprasad/interviewcopilot.git](https://github.com/hariiprasad/interviewcopilot.git)
    cd interviewcopilot
    ```
 
 2. **Install dependencies**
    ```bash
    npm install
+   ```
 
 3. **Run the development server**
    ```bash
@@ -62,14 +63,17 @@ An AI-powered interview assistant that provides real-time transcription and inte
 
 1. Open the Settings dialog (⚙️ icon in header)
 2. Enter your API credentials:
-   - OpenAI API Key
+   - OpenAI API Key (if using OpenAI models)
+   - Gemini API Key (if using Gemini models)
    - Azure Speech Service Key
    - Azure Region
 3. Configure preferences:
-   - GPT Model (default: gpt-3.5-turbo)
+   - AI Model (OpenAI or Gemini models)
+   - System Prompt
    - Auto-Ask mode
    - Manual Mode
-   - Response length
+   - Response length (concise, medium, lengthy)
+   - Silence Timer Duration
 
 ## Usage 🖥️
 
@@ -93,10 +97,12 @@ An AI-powered interview assistant that provides real-time transcription and inte
 
 ### Key Features
 
-- **Auto-Ask Mode**: Automatically submit questions after 2.5s of silence
-- **Manual Mode**: Type and submit candidate responses manually
-- **Combine Questions**: Select multiple questions from history for combined analysis
-- **Real-time Transcription**: Simultaneous speaker recognition and transcription
+- **Auto-Ask Mode**: Automatically submit questions after a configurable period of silence.
+- **Manual Mode**: Type and submit candidate responses manually.
+- **Combine Questions**: Select multiple questions from history for combined analysis.
+- **Real-time Transcription**: Simultaneous speaker recognition and transcription.
+- **Configurable AI Models**: Choose between OpenAI and various Gemini models.
+- **Response Length Control**: Tailor the length of AI-generated responses.
 
 ## Troubleshooting 🛠️
 
@@ -110,6 +116,7 @@ An AI-powered interview assistant that provides real-time transcription and inte
    - Verify API keys in settings
    - Check network connectivity
    - Ensure proper Azure region configuration
+   - Ensure correct API key is provided for the selected AI model
 
 3. **Transcription Issues**
    - Speak clearly with minimal background noise
@@ -132,9 +139,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments 🙏
 
 - OpenAI for their GPT models
+- Google for their Gemini models
 - Microsoft Azure Cognitive Services
 - Material-UI team for UI components
 - React community for awesome tools
-
-
-
