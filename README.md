@@ -33,7 +33,7 @@ An AI-powered interview assistant that provides real-time transcription and inte
 - Node.js (v18+)
 - npm (v9+)
 - OpenAI API key: get your OpenAI key [OpenAI key](https://platform.openai.com/docs/overview)
-- Gemini API key: get your Gemini key from Google AI Studio.
+- Gemini API key: get your Gemini key from Google AI Studio. [Get a free gemini api key here](https://aistudio.google.com/app/apikey)
 - Azure Speech Service subscription key: You can get a key with a free trial [Get your Azure key](https://azure.microsoft.com/en-us/pricing/purchase-options/azure-account)
 
 ### Installation
