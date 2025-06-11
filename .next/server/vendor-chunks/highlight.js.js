@@ -10,10 +10,10 @@ exports.id = "vendor-chunks/highlight.js";
 exports.ids = ["vendor-chunks/highlight.js"];
 exports.modules = {
 
-/***/ "./node_modules/highlight.js/styles/github-dark.css":
-/*!**********************************************************!*\
-  !*** ./node_modules/highlight.js/styles/github-dark.css ***!
-  \**********************************************************/
+/***/ "./node_modules/highlight.js/styles/atom-one-dark.css":
+/*!************************************************************!*\
+  !*** ./node_modules/highlight.js/styles/atom-one-dark.css ***!
+  \************************************************************/
 /***/ (() => {
 
 
