@@ -5,7 +5,7 @@ import { styled } from '@mui/material/styles';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import MicIcon from '@mui/icons-material/Mic';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
-import CodeIcon from '@mui/icons-material/Code';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SpeedIcon from '@mui/icons-material/Speed';
@@ -64,27 +64,27 @@ const features = [
   {
     icon: <RecordVoiceOverIcon fontSize="large" />,
     title: 'Real-time Transcription',
-    description: 'Accurate voice-to-text for both interviewer and candidate, powered by Azure Cognitive Services.',
+    description: 'Accurate voice-to-text for both coach and coachee, powered by Azure Cognitive Services.',
+  },
+  {
+    icon: <PsychologyIcon fontSize="large" />,
+    title: 'AI Coaching Insights',
+    description: 'Intelligent analysis and suggestions with conversational context awareness using the latest AI models.',
   },
   {
     icon: <QuestionAnswerIcon fontSize="large" />,
-    title: 'AI-Powered Insights',
-    description: 'Intelligent responses and suggestions with conversational context awareness using OpenAI/Gemini models.',
-  },
-  {
-    icon: <CodeIcon fontSize="large" />,
-    title: 'Code Formatting',
-    description: 'Clear syntax highlighting for technical discussions, making code easy to read and understand.',
+    title: 'Smart Question Generation',
+    description: 'Automatically generate powerful coaching questions based on conversation flow and coaching methodologies.',
   },
   {
     icon: <SpeedIcon fontSize="large" />,
-    title: 'Silence Detection',
-    description: 'Automatically submit questions or responses after a configurable period of silence for a smoother flow.',
+    title: 'Session Management',
+    description: 'Track dialogue duration, manage topics, and maintain session flow with intelligent automation.',
   },
   {
     icon: <SettingsIcon fontSize="large" />,
-    title: 'Customizable Settings',
-    description: 'Tailor AI models, API keys, and behavior to your specific needs and preferences.',
+    title: 'Customizable Experience',
+    description: 'Tailor AI models, coaching prompts, and behavior to your specific coaching style and preferences.',
   },
 ];
 
@@ -92,20 +92,20 @@ export default function LandingPage() {
   return (
     <>
       <Head>
-        <title>Interview Copilot - Your AI-Powered Interview Assistant</title>
-        <meta name="description" content="Elevate your technical interviews with real-time transcription, AI insights, and seamless assistance. Perfect for interviewers and candidates." />
-        <link rel="icon" href="/favicon.ico" /> {/* Remember to add a favicon */}
+        <title>Executive Coaching Assistant - AI-Powered Coaching Support</title>
+        <meta name="description" content="Elevate your executive coaching sessions with real-time transcription, AI insights, and intelligent question generation. Perfect for professional coaches and leadership development." />
+        <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <HeroSection>
         <Container maxWidth="md">
           <Typography variant="h2" component="h1" gutterBottom sx={{ fontWeight: 700, letterSpacing: '-1px' }}>
-            Interview Copilot
+            Executive Coaching Assistant
           </Typography>
           <Typography variant="h5" component="p" paragraph sx={{ mb: 4, opacity: 0.9 }}>
-            Elevate your technical interviews with AI-powered real-time transcription, intelligent suggestions, and seamless assistance. Focus on the conversation, let us handle the notes.
+            Elevate your executive coaching sessions with AI-powered real-time transcription, intelligent insights, and smart question generation. Focus on your client, let us handle the support.
           </Typography>
-          <Link href="/interview" passHref>
+          <Link href="/coaching" passHref>
             <Button
               variant="contained"
               color="secondary"
@@ -121,7 +121,7 @@ export default function LandingPage() {
                 }
               }}
             >
-              Start Assisting
+              Start Coaching Session
             </Button>
           </Link>
         </Container>
@@ -130,7 +130,7 @@ export default function LandingPage() {
       <Section id="features">
         <Container maxWidth="lg">
           <Typography variant="h4" component="h2" align="center" gutterBottom sx={{ mb: 6 }}>
-            Why Choose Interview Copilot?
+            Why Choose Executive Coaching Assistant?
           </Typography>
           <Grid container spacing={4}>
             {features.map((feature) => (
@@ -156,20 +156,20 @@ export default function LandingPage() {
             About the Tool
           </Typography>
           <Typography variant="h6" component="p" align="center" color="textSecondary" paragraph>
-            Interview Copilot is designed to be an indispensable assistant for technical interviews. Whether you're conducting interviews and need to capture key details, or you're a candidate wanting to review your performance, our tool provides the support you need.
+            Executive Coaching Assistant is designed to be an indispensable tool for professional coaches and leadership development sessions. Whether you're an executive coach, leadership consultant, or HR professional conducting coaching conversations, our AI-powered assistant provides the support you need.
           </Typography>
           <Typography variant="h6" component="p" align="center" color="textSecondary" paragraph>
-            Our mission is to make interviews more productive and insightful by leveraging the power of AI, allowing participants to focus on what truly matters: the skills, experience, and potential being discussed.
+            Our mission is to make coaching sessions more productive and insightful by leveraging the power of AI, allowing coaches to focus on what truly matters: building awareness, facilitating breakthroughs, and supporting transformational growth.
           </Typography>
         </Container>
       </Section>
 
       <Footer>
         <Typography variant="body2">
-          &copy; {new Date().getFullYear()} Interview Copilot. All rights reserved.
+          &copy; {new Date().getFullYear()} Executive Coaching Assistant. All rights reserved.
         </Typography>
         <Typography variant="caption" display="block" sx={{ mt: 1}}>
-          Powered by AI for smarter interviews.
+          Powered by AI for smarter coaching sessions.
         </Typography>
       </Footer>
     </>
