@@ -700,6 +700,35 @@ export default function CoachingPage() {
   };
 
   // Question Generation
+  const getLanguageInstructions = (azureLanguage) => {
+    const languageMap = {
+      'en-US': 'English',
+      'en-GB': 'English', 
+      'it-IT': 'Italian',
+      'fr-FR': 'French',
+      'es-ES': 'Spanish',
+      'de-DE': 'German',
+      'pt-PT': 'Portuguese',
+      'nl-NL': 'Dutch',
+      'ru-RU': 'Russian',
+      'ja-JP': 'Japanese',
+      'ko-KR': 'Korean',
+      'zh-CN': 'Chinese (Simplified)',
+      'zh-TW': 'Chinese (Traditional)'
+    };
+    
+    const language = languageMap[azureLanguage] || 'English';
+    
+    if (language === 'English') {
+      return 'Generate questions in English.';
+    }
+    
+    return `Generate questions in ${language}. Ensure the questions are:
+- Natural and fluent in ${language}
+- Culturally appropriate for ${language}-speaking contexts
+- Using proper coaching terminology in ${language}`;
+  };
+
   const generateCoachingQuestions = async (numQuestions = null) => {
     const questionsToGenerate = numQuestions || appConfig.numberOfQuestions || 2;
     
@@ -717,7 +746,26 @@ export default function CoachingPage() {
       .join('\n');
     
     const questionStyle = analyzeDialogueForQuestionStyle(dialogueBufferRef.current);
-    const prompt = generateQuestionPrompt(recentDialogue, questionsToGenerate, questionStyle);
+    const languageInstructions = getLanguageInstructions(appConfig.azureLanguage || 'en-US');
+    
+    const prompt = `As an expert executive coach, generate exactly ${questionsToGenerate} powerful coaching question(s) based on the conversation context provided.
+
+${languageInstructions}
+
+Guidelines for powerful coaching questions:
+- Use open-ended questions that cannot be answered with yes/no
+- Keep questions short and clear (ideally under 15 words)
+- Focus on the coachee's thoughts, feelings, and actions
+- Avoid "why" questions when possible (use "what" or "how" instead)
+- Include questions that challenge assumptions
+- Ensure questions are non-judgmental and curious
+
+Style: ${questionStyle}
+
+Recent conversation context:
+${recentDialogue || 'No recent dialogue captured yet.'}
+
+Please provide exactly ${questionsToGenerate} question(s), numbered and separated by newlines. Only provide the questions themselves, no additional explanation or context.`;
 
     try {
       let questionsResponse = '';
@@ -727,7 +775,7 @@ export default function CoachingPage() {
           model: appConfig.aiModel,
           max_tokens: 200,
           temperature: 0.7,
-          system: "You are an expert executive coach. Generate powerful, open-ended coaching questions.",
+          system: "You are an expert executive coach. Generate powerful, open-ended coaching questions in the requested language.",
           messages: [{ role: 'user', content: prompt }]
         });
         questionsResponse = response.content[0].text;
@@ -736,7 +784,7 @@ export default function CoachingPage() {
         const response = await aiClient.client.chat.completions.create({
           model: appConfig.aiModel,
           messages: [
-            { role: 'system', content: "You are an expert executive coach. Generate powerful, open-ended coaching questions." },
+            { role: 'system', content: "You are an expert executive coach. Generate powerful, open-ended coaching questions in the requested language." },
             { role: 'user', content: prompt }
           ],
           temperature: 0.7,
@@ -756,7 +804,8 @@ export default function CoachingPage() {
       // Parse the questions
       const questions = parseQuestions(questionsResponse, questionsToGenerate);
       
-      setSuggestedQuestions(questions);
+      // Add newest questions to the TOP of the array
+      setSuggestedQuestions(prev => [...questions, ...prev]);
       
       // Add to history
       const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1145,20 +1194,11 @@ export default function CoachingPage() {
                     value={transcriptionFromStore}
                     onChange={(e) => handleManualInputChange(e.target.value, 'coachee')}
                     onKeyDown={(e) => handleKeyPress(e, 'coachee')}
-                    placeholder="Coachee's speech..."
+                    placeholder="Coachee's speech (captured via system audio)..."
                     sx={{ mb: 2 }}
                   />
+                  
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                    <Button
-                      onClick={() => startMicrophoneRecognition('coachee')}
-                      variant="contained"
-                      color={isCoacheeMicActive ? 'error' : 'primary'}
-                      startIcon={isCoacheeMicActive ? <MicOffIcon /> : <MicIcon />}
-                      disabled={isSystemAudioActive}
-                      sx={{ flexGrow: 1 }}
-                    >
-                      {isCoacheeMicActive ? 'Stop Mic' : 'Start Mic'}
-                    </Button>
                     <Tooltip title="Clear Coachee Transcription">
                       <IconButton onClick={() => handleClearTranscription('coachee')}><DeleteSweepIcon /></IconButton>
                     </Tooltip>
@@ -1169,29 +1209,28 @@ export default function CoachingPage() {
                         color="primary"
                         startIcon={<SendIcon />}
                         disabled={isProcessing || !transcriptionFromStore.trim()}
+                        sx={{ flexGrow: 1 }}
                       >
-                        Submit
+                        Submit Manual Input
                       </Button>
                     )}
                   </Box>
                   
-                  <Divider sx={{ my: 1 }} />
-                  
                   <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                    Remote Coachee (System Audio)
+                    System Audio Capture (Remote Coachee)
                   </Typography>
                   <Button
                     onClick={startSystemAudioRecognition}
                     variant="contained"
-                    color={isSystemAudioActive ? 'error' : 'secondary'}
+                    color={isSystemAudioActive ? 'error' : 'primary'}
                     startIcon={isSystemAudioActive ? <StopScreenShareIcon /> : <ScreenShareIcon />}
-                    disabled={isCoacheeMicActive}
                     fullWidth
+                    size="large"
                   >
-                    {isSystemAudioActive ? 'Stop System Audio' : 'Capture System Audio'}
+                    {isSystemAudioActive ? 'Stop System Audio' : 'Start System Audio Capture'}
                   </Button>
                   <Typography variant="caption" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
-                    {isSystemAudioActive ? 'Recording system audio...' : 'Select "Chrome Tab" and check "Share audio" for remote coachee'}
+                    {isSystemAudioActive ? 'Recording system audio from shared tab...' : 'Select Chrome Tab → Check "Share audio" → Choose meeting tab'}
                   </Typography>
                 </CardContent>
               </Card>
