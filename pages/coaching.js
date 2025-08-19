@@ -110,6 +110,7 @@ export default function CoachingPage() {
   const [coacheeRecognizer, setCoacheeRecognizer] = useState(null);
   const [isCoachMicActive, setIsCoachMicActive] = useState(false);
   const [isCoacheeMicActive, setIsCoacheeMicActive] = useState(false);
+  const [isSystemAudioActive, setIsSystemAudioActive] = useState(false);
   const [coachTranscription, setCoachTranscription] = useState('');
   const [coacheeAutoMode, setCoacheeAutoMode] = useState(appConfig.coacheeAutoMode !== undefined ? appConfig.coacheeAutoMode : true);
   const [isManualMode, setIsManualMode] = useState(appConfig.isManualMode !== undefined ? appConfig.isManualMode : false);
@@ -344,7 +345,9 @@ export default function CoachingPage() {
   };
 
   const stopRecording = async (source) => {
-    const recognizer = source === 'coach' ? coachRecognizer : coacheeRecognizer;
+    const recognizer = source === 'coach' ? coachRecognizer : 
+                      source === 'coachee' ? coacheeRecognizer : null;
+    
     if (recognizer?.stopContinuousRecognitionAsync) {
       try {
         await recognizer.stopContinuousRecognitionAsync();
@@ -364,11 +367,75 @@ export default function CoachingPage() {
         if (source === 'coach') {
           setIsCoachMicActive(false);
           setCoachRecognizer(null);
-        } else {
+        } else if (source === 'coachee') {
           setIsCoacheeMicActive(false);
+          setCoacheeRecognizer(null);
+        } else if (source === 'system') {
+          setIsSystemAudioActive(false);
           setCoacheeRecognizer(null);
         }
       }
+    }
+  };
+
+  const startSystemAudioRecognition = async () => {
+    if (isSystemAudioActive) {
+      await stopRecording('system');
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      showSnackbar('Screen sharing is not supported by your browser.', 'error');
+      setIsSystemAudioActive(false);
+      return;
+    }
+
+    try {
+      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
+        audio: true,
+        video: {
+          displaySurface: 'browser',
+          logicalSurface: true
+        }
+      });
+
+      const audioTracks = mediaStream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        showSnackbar('No audio track detected. Please ensure you share a tab with audio.', 'warning');
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
+      if (coacheeRecognizer) {
+        await stopRecording('system');
+      }
+
+      const recognizerInstance = await createRecognizer(mediaStream, 'coachee');
+      if (recognizerInstance) {
+        setCoacheeRecognizer(recognizerInstance);
+        setIsSystemAudioActive(true);
+        showSnackbar('System audio recording started for coachee.', 'success');
+        mediaStream.getTracks().forEach(track => {
+          track.onended = () => {
+            showSnackbar('Tab sharing ended.', 'info');
+            stopRecording('system');
+          };
+        });
+      } else {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+    } catch (error) {
+      console.error('System audio capture error:', error);
+      if (error.name === "NotAllowedError") {
+        showSnackbar('Permission denied for screen recording. Please allow access.', 'error');
+      } else if (error.name === "NotFoundError") {
+        showSnackbar('No suitable tab/window found to share.', 'error');
+      } else if (error.name === "NotSupportedError") {
+        showSnackbar('System audio capture not supported by your browser.', 'error');
+      } else {
+        showSnackbar(`Failed to start system audio capture: ${error.message || 'Unknown error'}`, 'error');
+      }
+      setIsSystemAudioActive(false);
     }
   };
 
@@ -378,6 +445,11 @@ export default function CoachingPage() {
     if (isActive) {
       await stopRecording(source);
       return;
+    }
+
+    // For coachee, stop system audio if it's active
+    if (source === 'coachee' && isSystemAudioActive) {
+      await stopRecording('system');
     }
 
     try {
@@ -1031,6 +1103,20 @@ export default function CoachingPage() {
               />
             )}
             
+            {/* Quick Question Generation Button */}
+            <Tooltip title={`Generate ${appConfig.numberOfQuestions || 2} coaching question${(appConfig.numberOfQuestions || 2) > 1 ? 's' : ''}`}>
+              <Button
+                variant="contained"
+                color="secondary"
+                onClick={() => generateCoachingQuestions(appConfig.numberOfQuestions)}
+                disabled={generatingQuestions || !aiClient || isAILoading}
+                startIcon={generatingQuestions ? <CircularProgress size={16} color="inherit" /> : <PsychologyIcon />}
+                sx={{ mr: 2, whiteSpace: 'nowrap' }}
+              >
+                {generatingQuestions ? 'Generating...' : `Ask ${appConfig.numberOfQuestions || 2} Questions`}
+              </Button>
+            </Tooltip>
+            
             <Tooltip title="Settings">
               <IconButton color="primary" onClick={() => setSettingsOpen(true)} aria-label="settings">
                 <SettingsIcon />
@@ -1062,12 +1148,13 @@ export default function CoachingPage() {
                     placeholder="Coachee's speech..."
                     sx={{ mb: 2 }}
                   />
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                     <Button
                       onClick={() => startMicrophoneRecognition('coachee')}
                       variant="contained"
                       color={isCoacheeMicActive ? 'error' : 'primary'}
                       startIcon={isCoacheeMicActive ? <MicOffIcon /> : <MicIcon />}
+                      disabled={isSystemAudioActive}
                       sx={{ flexGrow: 1 }}
                     >
                       {isCoacheeMicActive ? 'Stop Mic' : 'Start Mic'}
@@ -1087,6 +1174,25 @@ export default function CoachingPage() {
                       </Button>
                     )}
                   </Box>
+                  
+                  <Divider sx={{ my: 1 }} />
+                  
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Remote Coachee (System Audio)
+                  </Typography>
+                  <Button
+                    onClick={startSystemAudioRecognition}
+                    variant="contained"
+                    color={isSystemAudioActive ? 'error' : 'secondary'}
+                    startIcon={isSystemAudioActive ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+                    disabled={isCoacheeMicActive}
+                    fullWidth
+                  >
+                    {isSystemAudioActive ? 'Stop System Audio' : 'Capture System Audio'}
+                  </Button>
+                  <Typography variant="caption" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+                    {isSystemAudioActive ? 'Recording system audio...' : 'Select "Chrome Tab" and check "Share audio" for remote coachee'}
+                  </Typography>
                 </CardContent>
               </Card>
               
@@ -1136,6 +1242,44 @@ export default function CoachingPage() {
 
             {/* Center Panel - AI Coaching Insights */}
             <Grid item xs={12} md={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+              {/* Quick Actions Bar */}
+              <Paper sx={{ p: 2, mb: 2, display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    onClick={() => generateCoachingQuestions(appConfig.numberOfQuestions)}
+                    disabled={generatingQuestions || !aiClient || isAILoading}
+                    startIcon={generatingQuestions ? <CircularProgress size={20} color="inherit" /> : <PsychologyIcon />}
+                    sx={{ minWidth: 180 }}
+                  >
+                    {generatingQuestions ? 'Generating...' : `Generate ${appConfig.numberOfQuestions || 2} Questions`}
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => setUrgentQuestionsDialog(true)}
+                    startIcon={<HelpOutlineIcon />}
+                    disabled={generatingQuestions}
+                  >
+                    Custom Questions
+                  </Button>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {suggestedQuestions.length > 0 && (
+                    <Chip 
+                      label={`${suggestedQuestions.length} Questions Ready`} 
+                      color="success" 
+                      variant="outlined" 
+                      size="small"
+                    />
+                  )}
+                </Box>
+              </Paper>
+              
               <Card sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                 <CardHeader
                   title="AI Coaching Insights"
@@ -1259,7 +1403,8 @@ export default function CoachingPage() {
         <Fab
           color="primary"
           aria-label="generate questions"
-          onClick={() => setUrgentQuestionsDialog(true)}
+          onClick={() => generateCoachingQuestions(appConfig.numberOfQuestions)}
+          disabled={generatingQuestions || !aiClient || isAILoading}
           sx={{
             position: 'fixed',
             bottom: 24,
@@ -1267,7 +1412,7 @@ export default function CoachingPage() {
             display: { xs: 'flex', md: 'none' } // Only show on mobile
           }}
         >
-          <LiveHelpIcon />
+          {generatingQuestions ? <CircularProgress size={24} color="inherit" /> : <PsychologyIcon />}
         </Fab>
 
         {/* Dialogs */}
