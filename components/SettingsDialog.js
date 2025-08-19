@@ -1,3 +1,4 @@
+// components/SettingsDialog.js
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -21,27 +22,48 @@ import {
   Grid,
   RadioGroup,
   FormControlLabel,
-  Radio
+  Radio,
+  List,
+  ListItem,
+  ListItemText,
+  Alert,
+  Tabs,
+  Tab,
+  Paper,
+  Slider,
+  Switch
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SaveIcon from '@mui/icons-material/Save';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { getConfig, setConfig, builtInModelGroups } from '../utils/config'; // Import builtInModelGroups
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { getConfig, setConfig, builtInModelGroups, getModelType } from '../utils/config';
+
+function TabPanel({ children, value, index, ...other }) {
+  return (
+    <div role="tabpanel" hidden={value !== index} {...other}>
+      {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
+    </div>
+  );
+}
 
 export default function SettingsDialog({ open, onClose, onSave }) {
   const [settings, setSettings] = useState(getConfig());
+  const [tabValue, setTabValue] = useState(0);
   const [newModelName, setNewModelName] = useState('');
   const [newModelId, setNewModelId] = useState('');
-  const [newModelType, setNewModelType] = useState('openai'); // 'openai' or 'gemini'
+  const [newModelType, setNewModelType] = useState('anthropic');
+  const [newModelApiEndpoint, setNewModelApiEndpoint] = useState(''); // For custom endpoints
 
   useEffect(() => {
     if (open) {
       setSettings(getConfig());
-      // Reset new model fields when dialog opens
       setNewModelName('');
       setNewModelId('');
-      setNewModelType('openai');
+      setNewModelType('anthropic');
+      setNewModelApiEndpoint('');
+      setTabValue(0);
     }
   }, [open]);
 
@@ -49,206 +71,395 @@ export default function SettingsDialog({ open, onClose, onSave }) {
     setSettings({ ...settings, [e.target.name]: e.target.value });
   };
 
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
   const handleAddNewModel = () => {
     if (!newModelName.trim() || !newModelId.trim()) {
-      alert('Please provide both a display name and an ID for the new model.');
+      alert('Please provide both a display name and a model ID.');
       return;
     }
-    const newModel = { label: newModelName.trim(), value: newModelId.trim(), type: newModelType };
+    
+    const newModel = {
+      label: newModelName.trim(),
+      value: newModelId.trim(),
+      type: newModelType,
+      endpoint: newModelApiEndpoint.trim() || undefined
+    };
+    
     const updatedCustomModels = [...(settings.customModels || []), newModel];
     setSettings({ ...settings, customModels: updatedCustomModels });
     setNewModelName('');
     setNewModelId('');
-    // Keep newModelType for potentially adding another of the same type
+    setNewModelApiEndpoint('');
   };
 
   const handleRemoveCustomModel = (indexToRemove) => {
     const updatedCustomModels = (settings.customModels || []).filter((_, index) => index !== indexToRemove);
-    // If the currently selected model was the one removed, reset to a default
     let currentAiModel = settings.aiModel;
+    
     if (settings.customModels[indexToRemove]?.value === currentAiModel) {
-        currentAiModel = builtInModelGroups[0]?.models[0]?.value || 'gpt-3.5-turbo'; // Fallback
+      currentAiModel = 'claude-3-5-sonnet-20241022'; // Default to Claude
     }
+    
     setSettings({ ...settings, customModels: updatedCustomModels, aiModel: currentAiModel });
   };
 
-
   const handleSave = () => {
-    // Validate model-key pairing
-    const selectedModelValue = settings.aiModel;
-    let selectedModelIsGemini = selectedModelValue.startsWith('gemini');
+    const modelType = getModelType(settings.aiModel);
     
-    // Check if the selected model is a custom Gemini model
-    const customGeminiModel = (settings.customModels || []).find(m => m.value === selectedModelValue && m.type === 'gemini');
-    if (customGeminiModel) {
-        selectedModelIsGemini = true;
-    }
-     // Check if the selected model is a custom OpenAI model
-    const customOpenAIModel = (settings.customModels || []).find(m => m.value === selectedModelValue && m.type === 'openai');
-     if (customOpenAIModel && !selectedModelIsGemini) { // if it's custom and not already flagged as gemini
-        // it's an OpenAI type model
-     }
-
-
-    if (selectedModelIsGemini && !settings.geminiKey) {
-      alert('Selected Gemini model requires a Gemini API key. Please enter a key or select a different model.');
+    // Validate API key for selected model
+    if (modelType === 'anthropic' && !settings.anthropicKey) {
+      alert('Selected Anthropic model requires an Anthropic API key.');
       return;
     }
-    if (!selectedModelIsGemini && !customOpenAIModel && !settings.openaiKey && !selectedModelValue.startsWith('gemini')) { // It's a built-in OpenAI or non-Gemini custom
-      alert('Selected OpenAI model requires an OpenAI API key. Please enter a key or select a different model.');
+    if (modelType === 'openai' && !settings.openaiKey) {
+      alert('Selected OpenAI model requires an OpenAI API key.');
       return;
     }
-     if (customOpenAIModel && !settings.openaiKey) {
-      alert('Selected custom OpenAI-type model requires an OpenAI API key.');
+    if (modelType === 'gemini' && !settings.geminiKey) {
+      alert('Selected Gemini model requires a Gemini API key.');
       return;
     }
-
 
     if (!settings.azureToken || !settings.azureRegion) {
-        alert('Azure Speech Token and Region are required for voice transcription.');
+      alert('Azure Speech Token and Region are required for voice transcription.');
     }
 
-    setConfig(settings); // Uses the setConfig from utils/config.js
+    setConfig(settings);
     if (onSave) onSave();
     onClose();
   };
 
+  // Combine built-in and custom models for the dropdown
+  const getAllModelGroups = () => {
+    const groups = [...builtInModelGroups];
+    const customGroup = groups.find(g => g.name === "Custom Models");
+    if (customGroup) {
+      customGroup.models = settings.customModels || [];
+    }
+    return groups.filter(g => g.name !== "Custom Models" || g.models.length > 0);
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider', pb: 1.5 }}>
-        Application Settings
+        Coaching Assistant Settings
         <IconButton aria-label="close" onClick={onClose} size="small">
           <CloseIcon />
         </IconButton>
       </DialogTitle>
+      
       <DialogContent sx={{ pt: 2.5 }}>
-        <Typography variant="h6" gutterBottom>API Keys</Typography>
-        <TextField
-          fullWidth margin="dense" name="openaiKey" label="OpenAI API Key" type="password"
-          value={settings.openaiKey || ''} onChange={handleChange} helperText="Required for OpenAI models."
-        />
-        <TextField
-          fullWidth margin="dense" name="geminiKey" label="Gemini API Key" type="password"
-          value={settings.geminiKey || ''} onChange={handleChange} helperText="Required for Gemini models." sx={{mt:2}}
-        />
+        <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
+          <Tab label="API Keys" />
+          <Tab label="AI Configuration" />
+          <Tab label="Question Generation" />
+          <Tab label="Custom Models" />
+          <Tab label="Speech Settings" />
+        </Tabs>
 
-        <Divider sx={{ my: 3 }} />
-        <Typography variant="h6" gutterBottom>AI Configuration</Typography>
-        <FormControl fullWidth margin="dense">
-          <InputLabel id="ai-model-select-label">AI Model</InputLabel>
-          <Select
-            labelId="ai-model-select-label" name="aiModel" value={settings.aiModel}
-            onChange={handleChange} label="AI Model"
-          >
-            {builtInModelGroups.map(group => ([
-              <ListSubheader key={group.name} sx={{ fontWeight: 'bold', color: 'text.primary', bgcolor: 'transparent', lineHeight: '2.5em' }}>
-                {group.name}
-              </ListSubheader>,
-              ...group.models.map(model => (
-                <MenuItem key={model.value} value={model.value}>{model.label}</MenuItem>
-              ))
-            ]))}
-            {(settings.customModels && settings.customModels.length > 0) && (
-              <ListSubheader sx={{ fontWeight: 'bold', color: 'text.primary', bgcolor: 'transparent', lineHeight: '2.5em', mt: 1 }}>
-                Custom Models
-              </ListSubheader>
-            )}
-            {(settings.customModels || []).map((model, index) => (
-              <MenuItem key={`custom-${model.value}-${index}`} value={model.value}>
-                {model.label} ({model.type === 'gemini' ? 'Gemini' : 'OpenAI'})
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <TextField
-          fullWidth margin="dense" name="gptSystemPrompt" label="AI System Prompt" multiline rows={3}
-          value={settings.gptSystemPrompt} onChange={handleChange} helperText="Instructions for the AI assistant." sx={{mt:2}}
-        />
-        <FormControl fullWidth margin="dense" sx={{mt:2}}>
+        {/* API Keys Tab */}
+        <TabPanel value={tabValue} index={0}>
+          <Typography variant="h6" gutterBottom>API Keys</Typography>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              Enter API keys for the AI providers you want to use. You only need keys for the models you plan to use.
+            </Typography>
+          </Alert>
+          
+          <TextField
+            fullWidth margin="dense" name="anthropicKey" label="Anthropic API Key (Claude)" type="password"
+            value={settings.anthropicKey || ''} onChange={handleChange}
+            helperText="Get your key from console.anthropic.com"
+          />
+          <TextField
+            fullWidth margin="dense" name="openaiKey" label="OpenAI API Key" type="password"
+            value={settings.openaiKey || ''} onChange={handleChange}
+            helperText="Get your key from platform.openai.com" sx={{ mt: 2 }}
+          />
+          <TextField
+            fullWidth margin="dense" name="geminiKey" label="Google Gemini API Key" type="password"
+            value={settings.geminiKey || ''} onChange={handleChange}
+            helperText="Get your key from aistudio.google.com" sx={{ mt: 2 }}
+          />
+        </TabPanel>
+
+        {/* AI Configuration Tab */}
+        <TabPanel value={tabValue} index={1}>
+          <Typography variant="h6" gutterBottom>AI Configuration</Typography>
+          
+          <FormControl fullWidth margin="dense">
+            <InputLabel id="ai-model-select-label">AI Model</InputLabel>
+            <Select
+              labelId="ai-model-select-label" name="aiModel" value={settings.aiModel}
+              onChange={handleChange} label="AI Model"
+            >
+              {getAllModelGroups().map(group => ([
+                <ListSubheader key={group.name} sx={{ fontWeight: 'bold', color: 'text.primary', bgcolor: 'transparent' }}>
+                  {group.name}
+                </ListSubheader>,
+                ...group.models.map(model => (
+                  <MenuItem key={model.value} value={model.value}>
+                    {model.label}
+                    {model.endpoint && <Chip label="Custom API" size="small" sx={{ ml: 1 }} />}
+                  </MenuItem>
+                ))
+              ]))}
+            </Select>
+          </FormControl>
+          
+          <TextField
+            fullWidth margin="dense" name="systemPrompt" label="AI System Prompt for Coaching"
+            multiline rows={4} value={settings.systemPrompt} onChange={handleChange}
+            helperText="Instructions for the AI assistant to support coaching sessions" sx={{ mt: 2 }}
+          />
+          
+          <FormControl fullWidth margin="dense" sx={{ mt: 2 }}>
             <InputLabel id="response-length-label">AI Response Length</InputLabel>
             <Select
-                labelId="response-length-label" name="responseLength" value={settings.responseLength}
-                onChange={handleChange} label="AI Response Length"
+              labelId="response-length-label" name="responseLength" value={settings.responseLength}
+              onChange={handleChange} label="AI Response Length"
             >
-                <MenuItem value="concise">Concise (Brief & to the point)</MenuItem>
-                <MenuItem value="medium">Medium (Balanced detail)</MenuItem>
-                <MenuItem value="lengthy">Lengthy (Detailed explanations)</MenuItem>
+              <MenuItem value="concise">Concise (Brief insights)</MenuItem>
+              <MenuItem value="medium">Medium (Balanced detail)</MenuItem>
+              <MenuItem value="lengthy">Lengthy (Comprehensive analysis)</MenuItem>
             </Select>
-        </FormControl>
+          </FormControl>
+        </TabPanel>
 
-        <Divider sx={{ my: 3 }} />
-        <Typography variant="h6" gutterBottom>Manage Custom AI Models</Typography>
-        <Box sx={{p:2, border: '1px dashed', borderColor: 'divider', borderRadius: 1, mb:2}}>
-            <Typography variant="subtitle1" gutterBottom>Add New Model</Typography>
-            <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} sm={4}>
-                    <TextField fullWidth margin="dense" label="Model Display Name" value={newModelName} onChange={(e) => setNewModelName(e.target.value)} />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                    <TextField fullWidth margin="dense" label="Model ID / Path" value={newModelId} onChange={(e) => setNewModelId(e.target.value)} />
-                </Grid>
-                <Grid item xs={12} sm={3}>
-                     <FormControl component="fieldset" margin="dense">
-                        <RadioGroup row name="newModelType" value={newModelType} onChange={(e) => setNewModelType(e.target.value)}>
-                            <FormControlLabel value="openai" control={<Radio size="small"/>} label="OpenAI" />
-                            <FormControlLabel value="gemini" control={<Radio size="small"/>} label="Gemini" />
-                        </RadioGroup>
-                    </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={1}>
-                    <Tooltip title="Add Model">
-                        <IconButton color="primary" onClick={handleAddNewModel} disabled={!newModelName.trim() || !newModelId.trim()}>
-                            <AddCircleOutlineIcon />
-                        </IconButton>
-                    </Tooltip>
-                </Grid>
-            </Grid>
-        </Box>
-         {(settings.customModels && settings.customModels.length > 0) && (
-            <Box>
-                <Typography variant="subtitle1" gutterBottom>Your Custom Models:</Typography>
-                <List dense>
-                {(settings.customModels || []).map((model, index) => (
-                    <ListItem
-                        key={index}
-                        secondaryAction={
-                            <Tooltip title="Remove Model">
-                            <IconButton edge="end" aria-label="delete" onClick={() => handleRemoveCustomModel(index)} size="small">
-                                <DeleteIcon fontSize="small"/>
-                            </IconButton>
-                            </Tooltip>
-                        }
-                        sx={{mb:0.5, bgcolor: 'action.hover', borderRadius: 1, p:1}}
-                    >
-                        <ListItemText primary={model.label} secondary={`${model.value} (${model.type === 'gemini' ? 'Gemini' : 'OpenAI'})`} />
-                    </ListItem>
-                ))}
-                </List>
+        {/* Question Generation Tab */}
+        <TabPanel value={tabValue} index={2}>
+          <Typography variant="h6" gutterBottom>Question Generation Settings</Typography>
+          
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              Configure how and when the AI suggests coaching questions during sessions.
+            </Typography>
+          </Alert>
+          
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Dialogue Listening Duration
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              How many seconds of dialogue to analyze before suggesting questions
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Slider
+                name="dialogueListenDuration"
+                value={settings.dialogueListenDuration || 30}
+                onChange={(e, value) => setSettings({ ...settings, dialogueListenDuration: value })}
+                min={10}
+                max={120}
+                step={5}
+                marks={[
+                  { value: 10, label: '10s' },
+                  { value: 30, label: '30s' },
+                  { value: 60, label: '1m' },
+                  { value: 90, label: '1.5m' },
+                  { value: 120, label: '2m' }
+                ]}
+                valueLabelDisplay="on"
+                valueLabelFormat={(value) => `${value}s`}
+                sx={{ flexGrow: 1 }}
+              />
+              <Typography variant="body1" sx={{ minWidth: 45 }}>
+                {settings.dialogueListenDuration || 30}s
+              </Typography>
             </Box>
-        )}
+          </Box>
+          
+          <Divider sx={{ my: 2 }} />
+          
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Number of Questions to Generate
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              How many coaching questions should be suggested each time
+            </Typography>
+            <RadioGroup
+              row
+              name="numberOfQuestions"
+              value={settings.numberOfQuestions || 2}
+              onChange={(e) => setSettings({ ...settings, numberOfQuestions: parseInt(e.target.value) })}
+            >
+              <FormControlLabel 
+                value={1} 
+                control={<Radio />} 
+                label={
+                  <Box>
+                    <Typography variant="body1">1 Question</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Single, focused question
+                    </Typography>
+                  </Box>
+                }
+              />
+              <FormControlLabel 
+                value={2} 
+                control={<Radio />} 
+                label={
+                  <Box>
+                    <Typography variant="body1">2 Questions</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Balanced approach
+                    </Typography>
+                  </Box>
+                }
+              />
+              <FormControlLabel 
+                value={3} 
+                control={<Radio />} 
+                label={
+                  <Box>
+                    <Typography variant="body1">3 Questions</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Multiple perspectives
+                    </Typography>
+                  </Box>
+                }
+              />
+            </RadioGroup>
+          </Box>
+          
+          <Divider sx={{ my: 2 }} />
+          
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.autoSuggestQuestions || true}
+                onChange={(e) => setSettings({ ...settings, autoSuggestQuestions: e.target.checked })}
+                color="primary"
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body1">Auto-Suggest Questions</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Automatically generate questions after the dialogue duration
+                </Typography>
+              </Box>
+            }
+          />
+        </TabPanel>
 
+        {/* Custom Models Tab */}
+        <TabPanel value={tabValue} index={3}>
+          <Typography variant="h6" gutterBottom>Add Custom Models</Typography>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              Add custom models from any provider (e.g., local models, Azure OpenAI, AWS Bedrock, etc.)
+            </Typography>
+            <Typography variant="caption">
+              Examples: llama-3.1-70b, mixtral-8x7b, azure-gpt-4, bedrock-claude-3
+            </Typography>
+          </Alert>
+          
+          <Paper sx={{ p: 2, border: '1px dashed', borderColor: 'divider', mb: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth label="Model Display Name" value={newModelName}
+                  onChange={(e) => setNewModelName(e.target.value)}
+                  placeholder="e.g., GPT-4 Azure"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth label="Model ID / Path" value={newModelId}
+                  onChange={(e) => setNewModelId(e.target.value)}
+                  placeholder="e.g., gpt-4-azure-deployment"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>API Type</InputLabel>
+                  <Select value={newModelType} onChange={(e) => setNewModelType(e.target.value)} label="API Type">
+                    <MenuItem value="anthropic">Anthropic Compatible</MenuItem>
+                    <MenuItem value="openai">OpenAI Compatible</MenuItem>
+                    <MenuItem value="gemini">Gemini Compatible</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth label="Custom Endpoint (Optional)" value={newModelApiEndpoint}
+                  onChange={(e) => setNewModelApiEndpoint(e.target.value)}
+                  placeholder="e.g., https://api.custom.com/v1"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Button
+                  variant="contained" color="primary" onClick={handleAddNewModel}
+                  startIcon={<AddCircleOutlineIcon />}
+                  disabled={!newModelName.trim() || !newModelId.trim()}
+                >
+                  Add Custom Model
+                </Button>
+              </Grid>
+            </Grid>
+          </Paper>
 
-        <Divider sx={{ my: 3 }} />
-        <Typography variant="h6" gutterBottom>Speech Configuration</Typography>
-         <TextField
-          fullWidth margin="dense" name="silenceTimerDuration" label="Silence Detection (seconds)"
-          type="number" inputProps={{ step: 0.1, min: 0.5, max: 5 }} value={settings.silenceTimerDuration}
-          onChange={handleChange} helperText="Auto-submit after this duration of silence (e.g., 1.2)."
-        />
-        <TextField
-          fullWidth margin="dense" name="azureToken" label="Azure Speech API Key" type="password"
-          value={settings.azureToken || ''} onChange={handleChange} helperText="Required for voice transcription." sx={{mt:2}}
-        />
-        <TextField
-          fullWidth margin="dense" name="azureRegion" label="Azure Region"
-          value={settings.azureRegion || ''} onChange={handleChange} helperText="E.g., eastus, westus." sx={{mt:2}}
-        />
-        <TextField
-          fullWidth margin="dense" name="azureLanguage" label="Azure Recognition Language"
-          value={settings.azureLanguage || ''} onChange={handleChange} helperText="E.g., en-US, es-ES." sx={{mt:2}}
-        />
+          {settings.customModels && settings.customModels.length > 0 && (
+            <Box>
+              <Typography variant="subtitle1" gutterBottom>Your Custom Models:</Typography>
+              <List dense>
+                {settings.customModels.map((model, index) => (
+                  <ListItem
+                    key={index}
+                    secondaryAction={
+                      <IconButton edge="end" onClick={() => handleRemoveCustomModel(index)} size="small">
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    }
+                    sx={{ mb: 0.5, bgcolor: 'action.hover', borderRadius: 1, p: 1 }}
+                  >
+                    <ListItemText
+                      primary={model.label}
+                      secondary={`${model.value} (${model.type}) ${model.endpoint ? '• Custom endpoint' : ''}`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+        </TabPanel>
+
+        {/* Speech Settings Tab */}
+        <TabPanel value={tabValue} index={4}>
+          <Typography variant="h6" gutterBottom>Speech Configuration</Typography>
+          
+          <TextField
+            fullWidth margin="dense" name="silenceTimerDuration" label="Silence Detection (seconds)"
+            type="number" inputProps={{ step: 0.1, min: 0.5, max: 5 }}
+            value={settings.silenceTimerDuration} onChange={handleChange}
+            helperText="Auto-submit after this duration of silence"
+          />
+          
+          <Divider sx={{ my: 2 }} />
+          
+          <Typography variant="subtitle1" gutterBottom>Azure Speech Services</Typography>
+          <TextField
+            fullWidth margin="dense" name="azureToken" label="Azure Speech API Key" type="password"
+            value={settings.azureToken || ''} onChange={handleChange}
+            helperText="Required for voice transcription"
+          />
+          <TextField
+            fullWidth margin="dense" name="azureRegion" label="Azure Region"
+            value={settings.azureRegion || ''} onChange={handleChange}
+            helperText="E.g., eastus, westus, westeurope" sx={{ mt: 2 }}
+          />
+          <TextField
+            fullWidth margin="dense" name="azureLanguage" label="Recognition Language"
+            value={settings.azureLanguage || ''} onChange={handleChange}
+            helperText="E.g., en-US, en-GB, es-ES, fr-FR" sx={{ mt: 2 }}
+          />
+        </TabPanel>
       </DialogContent>
+
       <DialogActions sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         <Button onClick={onClose} color="inherit">Cancel</Button>
         <Button onClick={handleSave} color="primary" variant="contained" startIcon={<SaveIcon />}>
